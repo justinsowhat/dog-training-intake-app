@@ -221,3 +221,6 @@ __marimo__/
 .env
 
 .DS_Store
+*.db
+
+node_modules/ 

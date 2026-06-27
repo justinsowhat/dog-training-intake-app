@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from app.schemas.intake import ComprehensiveIntakeSchema
-from app.schemas.plans import ComprehensiveTrainingPlanSchema
-from app.services import llm, prompts
-from app.tests.factories import (
+from backend.schemas.intake import ComprehensiveIntakeSchema
+from backend.schemas.plans import ComprehensiveTrainingPlanSchema
+from backend.services import llm, prompts
+from backend.tests.factories import (
     FakeLLMClient,
     completion_with_tool,
     completion_without_tool,
@@ -27,7 +27,7 @@ async def _collect(agen):
 
 def test_build_plan_tool_shape():
     tool = llm.build_plan_tool()
-    assert tool["type"] == "function"  # regression: was "fucntion"
+    assert tool["type"] == "function"
     assert tool["function"]["name"] == "submit_training_plan"
     assert "properties" in tool["function"]["parameters"]
 

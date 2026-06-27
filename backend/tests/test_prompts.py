@@ -1,7 +1,7 @@
-from app.schemas.intake import ComprehensiveIntakeSchema
-from app.schemas.plans import ComprehensiveTrainingPlanSchema
-from app.services import prompts
-from app.tests.factories import intake_payload, plan_payload
+from backend.schemas.intake import ComprehensiveIntakeSchema
+from backend.schemas.plans import ComprehensiveTrainingPlanSchema
+from backend.services import prompts
+from backend.tests.factories import intake_payload, plan_payload
 
 
 def _intake() -> ComprehensiveIntakeSchema:

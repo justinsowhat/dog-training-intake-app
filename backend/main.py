@@ -1,11 +1,11 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import chat
+from backend.api import chat
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.core.database import Base, async_engine
+    from backend.core.database import Base, async_engine
     async with async_engine.begin() as conn:
         print("[INFO] Database connection is being established")
         await conn.run_sync(Base.metadata.create_all)

@@ -5,11 +5,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db_session
-from app.core.deps import get_llm_client
-from app.core.models import ChatMessageORM, ConsultationORM, TrainingPlanORM
-from app.main import app
-from app.tests.factories import FakeLLMClient, intake_payload
+from backend.core.database import Base, get_db_session
+from backend.core.deps import get_llm_client
+from backend.core.models import ChatMessageORM, ConsultationORM, TrainingPlanORM
+from backend.main import app
+from backend.tests.factories import FakeLLMClient, intake_payload
 
 
 @pytest_asyncio.fixture

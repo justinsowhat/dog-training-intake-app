@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from openai import AsyncOpenAI
 from pydantic import ValidationError
 
-from app.core.config import settings
-from app.schemas.intake import ComprehensiveIntakeSchema
-from app.schemas.plans import ComprehensiveTrainingPlanSchema
-from app.services import prompts
+from backend.core.config import settings
+from backend.schemas.intake import ComprehensiveIntakeSchema
+from backend.schemas.plans import ComprehensiveTrainingPlanSchema
+from backend.services import prompts
 
 PLAN_TOOL_NAME = "submit_training_plan"
 

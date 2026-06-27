@@ -1,11 +1,11 @@
 """Prompt templates for the behavioral consulting agent.
 
 All prompt text lives here so it can be managed/tuned independently of the
-LLM orchestration logic in ``app.services.llm``. Functions here are pure string
+LLM orchestration logic in ``backend.services.llm``. Functions here are pure string
 builders — no LLM or DB access.
 """
-from app.schemas.intake import ComprehensiveIntakeSchema
-from app.schemas.plans import ComprehensiveTrainingPlanSchema
+from backend.schemas.intake import ComprehensiveIntakeSchema
+from backend.schemas.plans import ComprehensiveTrainingPlanSchema
 
 SYSTEM_BASE = (
     "You are a professional canine behavioral consultant certified.\n"

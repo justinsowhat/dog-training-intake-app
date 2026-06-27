@@ -1,7 +1,7 @@
 """Sample payloads and fake OpenAI-SDK objects for tests.
 
 The fakes mimic the small slice of the OpenAI streaming/non-streaming response
-shapes that ``app.services.llm`` actually touches (``choices[0].delta`` with
+shapes that ``backend.services.llm`` actually touches (``choices[0].delta`` with
 ``content``/``tool_calls`` for streaming, ``choices[0].message.tool_calls`` for
 the forced call).
 """

@@ -2,8 +2,8 @@ import json
 
 from sqlalchemy import select
 
-from app.core.models import ChatMessageORM, ConsultationORM, TrainingPlanORM
-from app.tests.factories import (
+from backend.core.models import ChatMessageORM, ConsultationORM, TrainingPlanORM
+from backend.tests.factories import (
     completion_with_tool,
     completion_without_tool,
     intake_payload,

@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 from typing import AsyncGenerator
-from app.core.config import settings
+from backend.core.config import settings
 
 async_opnerouter_client = AsyncOpenAI(
     base_url=settings.OPENROUTER_BASE_URL,

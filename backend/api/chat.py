@@ -6,12 +6,12 @@ from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.schemas.intake import ComprehensiveIntakeSchema
-from app.schemas.plans import ComprehensiveTrainingPlanSchema
-from app.core.database import get_db_session
-from app.core.deps import get_llm_client
-from app.core.models import ConsultationORM, ChatMessageORM, TrainingPlanORM
-from app.services import llm
+from backend.schemas.intake import ComprehensiveIntakeSchema
+from backend.schemas.plans import ComprehensiveTrainingPlanSchema
+from backend.core.database import get_db_session
+from backend.core.deps import get_llm_client
+from backend.core.models import ConsultationORM, ChatMessageORM, TrainingPlanORM
+from backend.services import llm
 
 router = APIRouter(prefix="/consultation", tags=["Chat"])
 
