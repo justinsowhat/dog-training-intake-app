@@ -25,7 +25,7 @@ class ChatMessageORM(Base):
     
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     consultation_id: Mapped[str] = mapped_column(ForeignKey("consultations.id"), nullable=False)
-    role: Mapped[str] = mapped_column(String(20), nullable=False)  # system, user, or assistant
+    role: Mapped[str] = mapped_column(String(20), nullable=False)  # system, user, assistant, or assistant_plan
     content: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -37,6 +37,8 @@ class TrainingPlanORM(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     consultation_id: Mapped[str] = mapped_column(ForeignKey("consultations.id"), nullable=False)
     plan_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    plan_status: Mapped[str] = mapped_column(String(20), default="proposed")  # proposed | finalized
     created_at:  Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    consultation: Mapped[ConsultationORM] = relationship("ConsultationORM", back_populates="training_plan")

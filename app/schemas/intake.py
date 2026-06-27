@@ -45,7 +45,7 @@ class NonHumanFamilyMember(BaseModel):
 class BehaviorIssueSection(BaseModel):
     """
     Represents an isolated behavioral issue subsection (e.g., Behavior 1, Behavior 2)
-    mirroring the exact Karen Pryor Academy discovery prompts.
+    mirroring the exact discovery prompts.
     """
     issue_title: str = Field(..., description="E.g., Car rides or Vet care phobia")
     target_behavior: str = Field(..., description="What is the behavior you're requesting help with?")
