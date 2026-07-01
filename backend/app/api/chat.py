@@ -64,6 +64,31 @@ def _upsert_plan(
         ))
 
 
+@router.get("/{consultation_id}")
+async def get_consultation(
+    consultation_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Full server-side state for a consultation, used to hydrate a shared link.
+
+    Server is the source of truth here (a second viewer has no local copy), so this
+    returns the intake, the ordered chat transcript, and the current plan (if any).
+    """
+    consult = await _load_consultation(db, consultation_id)
+    existing_plan, current_plan = await _load_current_plan(db, consultation_id)
+    messages = [
+        {"role": m.role, "content": m.content, "timestamp": m.timestamp.isoformat()}
+        for m in consult.messages
+    ]
+    return {
+        "consultation_id": consult.id,
+        "intake_snapshot": consult.intake_snapshot,
+        "messages": messages,
+        "plan": current_plan.model_dump() if current_plan else None,
+        "plan_status": existing_plan.plan_status if existing_plan else None,
+    }
+
+
 @router.post("/{consultation_id}/suggestions")
 async def opening_suggestions(
     consultation_id: str,
@@ -73,6 +98,21 @@ async def opening_suggestions(
     consult = await _load_consultation(db, consultation_id)
     intake = ComprehensiveIntakeSchema(**consult.intake_snapshot)
     suggestions = await llm.generate_opening_suggestions(client, intake)
+    return {"suggestions": suggestions}
+
+
+@router.post("/{consultation_id}/followup-suggestions")
+async def followup_suggestions(
+    consultation_id: str,
+    db: AsyncSession = Depends(get_db_session),
+    client: AsyncOpenAI = Depends(get_llm_client)
+) -> dict[str, list[str]]:
+    """Context-aware chips for the post-plan chat (regenerated each turn by the UI)."""
+    consult = await _load_consultation(db, consultation_id)
+    intake = ComprehensiveIntakeSchema(**consult.intake_snapshot)
+    history = [llm.ChatTurn(role=m.role, content=m.content) for m in consult.messages]
+    _, current_plan = await _load_current_plan(db, consultation_id)
+    suggestions = await llm.generate_followup_suggestions(client, intake, history, current_plan)
     return {"suggestions": suggestions}
 
 

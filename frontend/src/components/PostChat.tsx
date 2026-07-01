@@ -1,15 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConsultationChat, type ChatMessage } from "@/lib/useConsultationChat";
+import { fetchFollowupSuggestions } from "@/lib/api";
 import { messagesKey } from "@/lib/storage";
 import type { ComprehensiveTrainingPlan } from "@/lib/types";
 import { ChatThread, Chips, ChatComposer } from "./ChatThread";
-
-const SUGGESTIONS = [
-  "How do I start the first protocol?",
-  "What if a visitor shows up?",
-  "Can we make week 1 lighter?",
-  "Show me the emergency steps",
-];
 
 export function PostChat({
   consultationId,
@@ -26,6 +20,10 @@ export function PostChat({
   onPlanRevised: (plan: ComprehensiveTrainingPlan) => void;
 }) {
   const [input, setInput] = useState("");
+  // Context-aware follow-up chips: fetched on mount and refreshed after each turn.
+  const [chips, setChips] = useState<string[]>([]);
+  // Set when the agent revises the plan, so we can surface a "view updated plan" CTA.
+  const [planUpdated, setPlanUpdated] = useState(false);
 
   const initialMessages = useMemo<ChatMessage[]>(
     () => [
@@ -38,23 +36,53 @@ export function PostChat({
     [petName, ownerFirst]
   );
 
+  const handlePlan = useCallback(
+    (plan: ComprehensiveTrainingPlan) => {
+      setPlanUpdated(true);
+      onPlanRevised(plan);
+    },
+    [onPlanRevised]
+  );
+
   // Same consultation id -> the backend continues from the full stored history,
   // so this follow-up chat is aware of the plan it just generated and can revise it.
   const { messages, status, send: sendMessage } = useConsultationChat({
     consultationId,
     initialMessages,
-    onPlan: onPlanRevised,
+    onPlan: handlePlan,
     storageKey: messagesKey(consultationId, "post"),
   });
 
   const isStreaming = status !== "ready";
   const ready = status === "ready";
 
-  function send(text: string) {
+  const refreshSuggestions = useCallback(() => {
+    void fetchFollowupSuggestions(consultationId).then(setChips);
+  }, [consultationId]);
+
+  // Initial chips, tailored to the plan.
+  useEffect(() => {
+    let active = true;
+    void fetchFollowupSuggestions(consultationId).then((s) => {
+      if (active) setChips(s);
+    });
+    return () => {
+      active = false;
+    };
+  }, [consultationId]);
+
+  async function send(text: string) {
     const t = text.trim();
     if (!t || isStreaming) return;
     setInput("");
-    void sendMessage(t);
+    setChips([]); // hide stale chips while the turn streams
+    await sendMessage(t);
+    refreshSuggestions(); // re-tailor chips to the latest exchange
+  }
+
+  function viewUpdatedPlan() {
+    setPlanUpdated(false);
+    onViewPlan();
   }
 
   return (
@@ -96,7 +124,26 @@ export function PostChat({
       <ChatThread messages={messages} typing={status === "submitting"} />
 
       <div style={{ paddingTop: 12 }}>
-        {ready && <Chips options={SUGGESTIONS} onPick={send} />}
+        {planUpdated && (
+          <button
+            onClick={viewUpdatedPlan}
+            style={{
+              display: "block",
+              width: "100%",
+              background: "var(--accent-soft)",
+              border: "1px solid var(--accent)",
+              color: "var(--accent)",
+              fontSize: 14,
+              fontWeight: 700,
+              padding: "11px 16px",
+              borderRadius: "var(--radius)",
+              marginBottom: 12,
+            }}
+          >
+            ✓ Plan updated — view the updated plan →
+          </button>
+        )}
+        {ready && chips.length > 0 && <Chips options={chips} onPick={send} />}
         <ChatComposer
           value={input}
           onChange={setInput}

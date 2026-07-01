@@ -160,10 +160,13 @@ async def stream_agent_turn(
             break
         result_sink.proposed_plan = plan
         yield StreamEvent(type="plan", plan=plan)
-        yield StreamEvent(
-            type="message",
-            text=prompts.PLAN_PROPOSED_CONFIRMATION.format(pet_name=plan.pet_name),
+        # A pre-existing plan means this submission is a revision, not a first proposal.
+        confirmation = (
+            prompts.PLAN_REVISED_CONFIRMATION
+            if current_plan is not None
+            else prompts.PLAN_PROPOSED_CONFIRMATION
         )
+        yield StreamEvent(type="message", text=confirmation.format(pet_name=plan.pet_name))
         break
 
     yield StreamEvent(type="done")
@@ -212,6 +215,14 @@ def build_suggestions_tool() -> dict:
 # Used when the model is unavailable or returns nothing usable.
 FALLBACK_SUGGESTIONS = ["Tell me more about that", "It happens often", "Something else"]
 
+# Generic follow-up chips shown if context-aware generation fails.
+FALLBACK_FOLLOWUP_SUGGESTIONS = [
+    "How do I start the first protocol?",
+    "What if a visitor shows up?",
+    "Can we make week 1 lighter?",
+    "Show me the emergency steps",
+]
+
 
 async def generate_opening_suggestions(
     client: AsyncOpenAI,
@@ -245,3 +256,40 @@ async def generate_opening_suggestions(
         # Covers API errors (bad model slug, no tool support), bad JSON, validation, etc.
         logger.warning("opening suggestions failed (%s); using fallback", exc)
         return list(FALLBACK_SUGGESTIONS)
+
+
+async def generate_followup_suggestions(
+    client: AsyncOpenAI,
+    intake: ComprehensiveIntakeSchema,
+    history: list[ChatTurn],
+    current_plan: ComprehensiveTrainingPlanSchema | None,
+    limit: int = 4,
+) -> list[str]:
+    """Generate context-aware follow-up chips for the post-plan chat.
+
+    Grounded in the current plan and the conversation so far (so the chips track
+    where the discussion has gone rather than repeating). Best-effort: returns
+    FALLBACK_FOLLOWUP_SUGGESTIONS if the model misbehaves, so the UI always has
+    something to show.
+    """
+    messages = build_messages(intake, history, current_plan)
+    messages.append(
+        {"role": "user", "content": prompts.render_followup_suggestions_prompt(intake, current_plan)}
+    )
+    try:
+        response = await client.chat.completions.create(
+            model=settings.MODEL_SLUG,
+            messages=messages,
+            tools=[build_suggestions_tool()],
+            tool_choice={"type": "function", "function": {"name": SUGGESTIONS_TOOL_NAME}},
+        )
+        message = response.choices[0].message
+        if not message.tool_calls:
+            logger.warning("followup suggestions: model returned no tool call; using fallback")
+            return list(FALLBACK_FOLLOWUP_SUGGESTIONS)
+        parsed = _OpeningSuggestions(**json.loads(message.tool_calls[0].function.arguments))
+        cleaned = [s.strip() for s in parsed.suggestions if s and s.strip()]
+        return cleaned[:limit] or list(FALLBACK_FOLLOWUP_SUGGESTIONS)
+    except Exception as exc:  # noqa: BLE001 — best-effort; never break the chat screen
+        logger.warning("followup suggestions failed (%s); using fallback", exc)
+        return list(FALLBACK_FOLLOWUP_SUGGESTIONS)

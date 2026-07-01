@@ -35,8 +35,11 @@ CURRENT_PLAN_SECTION_HEADER = (
     "=== CURRENT PROPOSED PLAN (revise, do not regenerate from scratch) ===\n"
 )
 CURRENT_PLAN_SECTION_FOOTER = (
-    "\nWhen the user requests changes, call `submit_training_plan` again with the FULL revised plan,\n"
-    "preserving unchanged sections verbatim. The submission replaces the entire stored plan.\n"
+    "\nWhen the user asks to change, soften, add, remove, reorder, or re-pace ANYTHING in the plan,\n"
+    "you MUST call `submit_training_plan` again with the COMPLETE revised plan, preserving the\n"
+    "unchanged sections verbatim. The submission replaces the entire stored plan. If the user is\n"
+    "only asking a question or chatting (not requesting a change), just answer conversationally and\n"
+    "do NOT call the tool.\n"
     "=====================================================================\n"
 )
 
@@ -47,10 +50,15 @@ FINALIZE_INSTRUCTION = (
     "training plan details based on our conversation."
 )
 
-# Canned confirmation emitted after the agent proposes/revises a plan (no extra LLM round-trip).
+# Canned confirmation emitted after the agent proposes a plan for the first time (no extra LLM round-trip).
 PLAN_PROPOSED_CONFIRMATION = (
     "I've put together a proposed training plan for {pet_name} based on everything we've covered. "
     "Take a look — tell me if you'd like to adjust any phase, soften the management steps, or add a protocol."
+)
+
+# Canned confirmation emitted after the agent REVISES an existing plan in follow-up chat.
+PLAN_REVISED_CONFIRMATION = (
+    "I've updated {pet_name}'s plan with that change — open the plan to see the revised version."
 )
 
 
@@ -73,6 +81,30 @@ def render_opening_suggestions_prompt(intake: ComprehensiveIntakeSchema) -> str:
         "conversation — concrete angles or sub-problems of this concern worth exploring first. "
         "Make them specific to what they wrote, not generic. Then add a final option exactly: "
         '"Something else". Return them via the suggest_openers tool.'
+    )
+
+
+def render_followup_suggestions_prompt(
+    intake: ComprehensiveIntakeSchema,
+    current_plan: ComprehensiveTrainingPlanSchema | None = None,
+) -> str:
+    """Prompt for short follow-up chips, tailored to the plan and the conversation so far.
+
+    Unlike the opening chips (derived once from the intake), these are meant to be
+    regenerated each turn so they track where the follow-up conversation has gone.
+    """
+    plan_context = (
+        f"\n\nThe current plan covers:\n{render_plan_summary(current_plan)}"
+        if current_plan is not None
+        else ""
+    )
+    return (
+        f"The owner of {intake.pet_name} (a {_species_label(intake)}) already has a training plan "
+        f"and is now in the follow-up chat.{plan_context}\n\n"
+        "Based on this plan and the conversation so far, generate 3-4 short tap-to-send messages "
+        "(each 2-6 words) the owner is most likely to want NEXT — e.g. starting a specific protocol, "
+        "handling a tricky situation, or adjusting the plan's pace. Make them specific to THIS plan "
+        "and the latest exchange, not generic. Return them via the suggest_openers tool."
     )
 
 

@@ -92,6 +92,31 @@ async def test_stream_proposes_plan_from_fragmented_tool_call():
     assert sink.assistant_text == "Let me draft that. "
 
 
+async def test_stream_proposed_confirmation_when_no_existing_plan():
+    fake = FakeLLMClient()
+    fake.stream_chunks = [tool_chunk(0, name="submit_training_plan", args=json.dumps(plan_payload()))]
+    sink = llm.AgentTurnResult()
+
+    events = await _collect(llm.stream_agent_turn(fake, _intake(), [], None, sink))
+
+    msg = next(e for e in events if e.type == "message")
+    assert msg.text == prompts.PLAN_PROPOSED_CONFIRMATION.format(pet_name="Rex")
+
+
+async def test_stream_revised_confirmation_when_plan_already_exists():
+    existing = ComprehensiveTrainingPlanSchema(**plan_payload())
+    fake = FakeLLMClient()
+    fake.stream_chunks = [
+        tool_chunk(0, name="submit_training_plan", args=json.dumps(plan_payload(triage="revised"))),
+    ]
+    sink = llm.AgentTurnResult()
+
+    events = await _collect(llm.stream_agent_turn(fake, _intake(), [], existing, sink))
+
+    msg = next(e for e in events if e.type == "message")
+    assert msg.text == prompts.PLAN_REVISED_CONFIRMATION.format(pet_name="Rex")
+
+
 async def test_stream_malformed_tool_args_yields_error_not_crash():
     fake = FakeLLMClient()
     fake.stream_chunks = [tool_chunk(0, name="submit_training_plan", args="{not valid json")]
@@ -194,3 +219,28 @@ async def test_opening_suggestions_falls_back_on_bad_json():
     fake = FakeLLMClient()
     fake.completion = completion_with_tool("{bad", name="suggest_openers")
     assert await llm.generate_opening_suggestions(fake, _intake()) == llm.FALLBACK_SUGGESTIONS
+
+
+# --- follow-up suggestions -------------------------------------------------
+
+async def test_followup_suggestions_uses_plan_and_history_context():
+    plan = ComprehensiveTrainingPlanSchema(**plan_payload())
+    history = [llm.ChatTurn(role="user", content="how do I start?")]
+    fake = FakeLLMClient()
+    fake.completion = completion_with_tool(
+        json.dumps({"suggestions": ["Start mat work", "Soften week 1"]}), name="suggest_openers"
+    )
+
+    out = await llm.generate_followup_suggestions(fake, _intake(), history, plan)
+    assert out == ["Start mat work", "Soften week 1"]
+    # System prompt carries the current plan; the user turn is the follow-up ask.
+    sent = fake.calls[0]["messages"]
+    assert "CURRENT PROPOSED PLAN" in sent[0]["content"]
+    assert sent[-1]["role"] == "user"
+
+
+async def test_followup_suggestions_falls_back_when_no_tool_call():
+    fake = FakeLLMClient()
+    fake.completion = completion_without_tool()
+    out = await llm.generate_followup_suggestions(fake, _intake(), [], None)
+    assert out == llm.FALLBACK_FOLLOWUP_SUGGESTIONS

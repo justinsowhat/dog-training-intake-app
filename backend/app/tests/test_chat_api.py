@@ -54,6 +54,74 @@ async def test_suggestions_404_for_unknown_consultation(client, fake_llm):
     assert resp.status_code == 404
 
 
+# --- /followup-suggestions -------------------------------------------------
+
+async def test_followup_suggestions_returns_context_aware_chips(client, fake_llm, consultation_id, session_maker):
+    # Seed a plan so the follow-up prompt has plan context to work from.
+    async with session_maker() as db:
+        db.add(TrainingPlanORM(
+            consultation_id=consultation_id, plan_payload=plan_payload(), plan_status="proposed"
+        ))
+        await db.commit()
+
+    fake_llm.completion = completion_with_tool(
+        json.dumps({"suggestions": ["Start mat work", "Soften week 1", "Something else"]}),
+        name="suggest_openers",
+    )
+    resp = await client.post(f"/consultation/{consultation_id}/followup-suggestions")
+    assert resp.status_code == 200
+    assert resp.json()["suggestions"] == ["Start mat work", "Soften week 1", "Something else"]
+    # The current plan was injected as context for tailoring the chips.
+    assert "CURRENT PROPOSED PLAN" in fake_llm.calls[0]["messages"][0]["content"]
+
+
+async def test_followup_suggestions_falls_back_when_no_tool_call(client, fake_llm, consultation_id):
+    fake_llm.completion = completion_without_tool()
+    resp = await client.post(f"/consultation/{consultation_id}/followup-suggestions")
+    assert resp.status_code == 200
+    assert resp.json()["suggestions"]  # non-empty fallback, never breaks the UI
+
+
+async def test_followup_suggestions_404_for_unknown_consultation(client, fake_llm):
+    resp = await client.post("/consultation/nope/followup-suggestions")
+    assert resp.status_code == 404
+
+
+# --- GET / (shared-link hydration) -----------------------------------------
+
+async def test_get_consultation_returns_intake_messages_and_plan(client, consultation_id, session_maker):
+    async with session_maker() as db:
+        db.add(ChatMessageORM(consultation_id=consultation_id, role="user", content="he panics"))
+        db.add(ChatMessageORM(consultation_id=consultation_id, role="assistant", content="tell me more"))
+        db.add(TrainingPlanORM(
+            consultation_id=consultation_id, plan_payload=plan_payload(), plan_status="finalized"
+        ))
+        await db.commit()
+
+    resp = await client.get(f"/consultation/{consultation_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["consultation_id"] == consultation_id
+    assert body["intake_snapshot"]["pet_name"] == "Rex"
+    assert [m["role"] for m in body["messages"]] == ["user", "assistant"]
+    assert body["plan"]["pet_name"] == "Rex"
+    assert body["plan_status"] == "finalized"
+
+
+async def test_get_consultation_without_plan_returns_null_plan(client, consultation_id):
+    resp = await client.get(f"/consultation/{consultation_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"] is None
+    assert body["plan_status"] is None
+    assert body["messages"] == []
+
+
+async def test_get_consultation_404_for_unknown_consultation(client):
+    resp = await client.get("/consultation/does-not-exist")
+    assert resp.status_code == 404
+
+
 # --- /chat -----------------------------------------------------------------
 
 async def test_chat_streams_ndjson_and_persists_messages(client, fake_llm, consultation_id, session_maker):
